@@ -16,7 +16,7 @@ import java.util.regex.Pattern;
  * latest version 2016/02/16.
  */
 public class GmailTrader {
-    final static String version="20160216 two MT4 trader";
+    final static String version="20160330 two MT4 trader";
     final static Pattern ACTUALPattern = Pattern.compile("ACTUAL\\s*:\\s*(\\-*\\d+.\\d+)", Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
     final static Pattern SurveyPattern = Pattern.compile("SURVEY\\s*:\\s*(\\-*\\d+.\\d+)", Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
     final static Pattern PriorPattern = Pattern.compile("PRIOR\\s*:\\s*(\\-*\\d+.\\d+)", Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
@@ -95,16 +95,23 @@ public class GmailTrader {
         File index_file=new File(config_props.getProperty("INDEX"));
 
 
-        try {
+        boolean initSuccess=false;
+        while(!initSuccess) {
+            try {
             initial_table(before_file,after_file,index_file);
- //           initial_PL_table(before_file, after_file);
-        }catch (IOException e ){
-            System.out.println(e + "file error");
-        }
+//                initial_PL_table(before_file, after_file);
+                System.out.println("winrate_table size:"+before_winrate_table.size());
+                if (before_winrate_table.size()==128){
+                    initSuccess=true;
+                }
+            } catch (IOException e) {
+                System.out.println(e + "file error");
+            }
         trade_threshold=0.5;
         trade_threshold_class=0.7;
- //       trade_threshold=0;
-//        trade_threshold_class=100;
+//            trade_threshold = 0;
+//            trade_threshold_class = 100;
+        }
 
         //set unseen mail to seen , prevent error trading
         initialEmailConnection();
@@ -433,11 +440,16 @@ public class GmailTrader {
     }
 
     // below don't have to read.
-
     private static String parseActual(String content){
         try {
             ACTUALMatcher = ACTUALPattern.matcher(content);
+            PriorMatcher = PriorPattern.matcher( content);
             SURVEYMatcher = SurveyPattern.matcher(content);
+            String double_Prior="";
+            if(PriorMatcher.find()) {
+                double_Prior = PriorMatcher.group(1);
+                //System.out.println("Prior:"+double_Prior);
+            }
             String double_Actual = "";
             if (ACTUALMatcher.find()) {
                 double_Actual = ACTUALMatcher.group(1);
@@ -450,18 +462,19 @@ public class GmailTrader {
             }
             double survey;
             double actual;
+            double prior;
             try {
+                prior = Double.parseDouble(double_Prior);
                 survey = Double.parseDouble(double_Survey);
                 actual = Double.parseDouble(double_Actual);
             }catch(NumberFormatException e){
                 return noaction;
             }
-            System.out.println("Actual:" + actual + "; Survey:" + survey);
-            if (actual > survey) {
+            System.out.println("Actual:" + actual + "; Survey:" + survey + "; Prior:" + prior);
+            if (actual > survey && actual >prior) {
                 return better;
             }
-            if (actual < survey) {
-
+            if (actual < survey && actual <prior ) {
                 return worse;
             }
         }catch(Exception e){
